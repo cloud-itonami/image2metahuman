@@ -1,0 +1,200 @@
+#!/usr/bin/env nbb
+;; docs/check-declared.cljs — does anything this repo declares actually exist?
+;;
+;;   nbb docs/check-declared.cljs           # from the repo root
+;;
+;; This repo declares two kinds of things it does not contain:
+;;
+;;   1. hostnames  — kotodama.jsonld routes the actor at two etzhayyim.com
+;;                   subdomains
+;;   2. packages   — two package.json files depend on `workspace:*` siblings
+;;                   that were left behind when the app was extracted out of
+;;                   the etzhayyim/root pnpm workspace
+;;
+;; The README states, as a dated measurement, that none of them resolve. A
+;; dated measurement rots. This re-takes it.
+;;
+;; Nothing here is a hardcoded list — the hosts are extracted from the files
+;; that name them and the packages from the files that depend on them, so a
+;; new route or a new dependency comes under the check automatically.
+;;
+;; Exit codes are three-valued on purpose. "Could not measure" must not be
+;; reachable from the same exit code as "measured, all fine":
+;;
+;;   0  everything declared is backed by something that exists
+;;   1  at least one declared thing is absent          <- the state on 2026-08-13
+;;   3  COULD NOT ANSWER — nothing was extracted (wrong directory?), or the
+;;      control host failed, so this machine has no working DNS and an
+;;      NXDOMAIN here would mean nothing. Never report a pass from this state.
+
+(ns check-declared
+  (:require ["node:dns/promises" :as dns]
+            ["node:fs" :as fs]
+            ["node:path" :as path]
+            ["node:process" :as process]
+            [clojure.string :as str]
+            [promesa.core :as p]))
+
+;; A host we do not control, used only to prove DNS works at all. If this
+;; fails, every NXDOMAIN below is uninterpretable.
+(def control-host "registry.npmjs.org")
+
+;; Prose is deliberately excluded (no ".md"). This measures what the repo
+;; *declares* — descriptors, manifests, config, code — not what its
+;; documentation says about those declarations. Including .md would make the
+;; README's own status table register as a declaration of the very hosts it
+;; reports as missing, and every host would then cite the file reporting it.
+(def scan-exts #{".jsonld" ".json" ".ts" ".svelte" ".html" ".edn"})
+(def skip-dirs #{"node_modules" ".svelte-kit" ".git" "dist" "build"})
+
+(defn walk
+  "Every scannable file under dir, skipping build output and vendored trees."
+  [dir]
+  (reduce
+   (fn [acc entry]
+     (let [nm (.-name entry)
+           full (path/join dir nm)]
+       (cond
+         (.isDirectory entry) (if (contains? skip-dirs nm) acc (into acc (walk full)))
+         (contains? scan-exts (path/extname nm)) (conj acc full)
+         :else acc)))
+   []
+   (fs/readdirSync dir #js {:withFileTypes true})))
+
+(defn hosts-in
+  "Hostnames under the project's own domain that this file names."
+  [text]
+  (set (map str/lower-case
+            (re-seq #"(?i)(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+etzhayyim\.com" text))))
+
+(defn- read-text [f]
+  (try (str (fs/readFileSync f "utf8")) (catch :default _ nil)))
+
+(defn- read-json [f]
+  (try (js->clj (js/JSON.parse (read-text f)) :keywordize-keys false)
+       (catch :default _ nil)))
+
+(defn collect-hosts
+  "host -> sorted set of repo-relative files that declare it."
+  [root files]
+  (reduce
+   (fn [acc f]
+     (let [rel (path/relative root f)]
+       (reduce (fn [a h] (update a h (fnil conj (sorted-set)) rel))
+               acc
+               (hosts-in (or (read-text f) "")))))
+   {}
+   files))
+
+(defn package-manifests
+  "Every package.json in the tree, as [rel parsed]."
+  [root files]
+  (keep (fn [f]
+          (when (= "package.json" (path/basename f))
+            (when-let [j (read-json f)]
+              [(path/relative root f) j])))
+        files))
+
+(defn collect-workspace-deps
+  "package name -> sorted set of repo-relative package.json files depending on
+   it via the `workspace:` protocol. These are the ones the extraction could
+   have broken; a registry dependency is pnpm's problem, not this repo's."
+  [manifests]
+  (reduce
+   (fn [acc [rel j]]
+     (reduce
+      (fn [a section]
+        (reduce (fn [b [dep spec]]
+                  (if (and (string? spec) (str/starts-with? spec "workspace:"))
+                    (update b dep (fnil conj (sorted-set)) rel)
+                    b))
+                a
+                (get j section)))
+      acc
+      ["dependencies" "devDependencies" "optionalDependencies"]))
+   {}
+   manifests))
+
+(defn resolves?
+  "true / false, or :error when lookup failed for a reason that is not NXDOMAIN
+   (so we never read a transient resolver fault as a missing host)."
+  [h]
+  (-> (dns/lookup h)
+      (p/then (fn [_] true))
+      (p/catch (fn [e]
+                 (let [code (.-code e)]
+                   (if (contains? #{"ENOTFOUND" "ENODATA"} code) false :error))))))
+
+(defn- pad-left [s w] (str (str/join (repeat (max 0 (- w (count s))) " ")) s))
+
+(defn -main []
+  (let [root (process/cwd)
+        files (walk root)
+        declared (collect-hosts root files)
+        hosts (sort (keys declared))
+        manifests (package-manifests root files)
+        ws-deps (collect-workspace-deps manifests)
+        ;; A `workspace:*` dep is satisfiable only if some package.json in this
+        ;; repo declares that name. After extraction, none do.
+        provided (set (keep (fn [[_ j]] (get j "name")) manifests))
+        deps (sort (keys ws-deps))
+        missing-deps (remove provided deps)]
+    (p/let [control (resolves? control-host)]
+      (cond
+        (not (true? control))
+        (do (println (str "COULD NOT ANSWER: control host " control-host " did not resolve."))
+            (println "DNS is not working here, so an NXDOMAIN below would prove nothing.")
+            (println "Refusing to report on the declared hosts.")
+            (process/exit 3))
+
+        ;; Evidence floor: an empty scan must not look like a clean scan.
+        (and (empty? hosts) (empty? deps))
+        (do (println (str "COULD NOT ANSWER: scanned " (count files) " files under " root
+                          " and extracted 0 declared hosts and 0 workspace deps."))
+            (println "Either this is not the repo root, or the declarations are gone.")
+            (process/exit 3))
+
+        :else
+        (p/let [states (p/all (map resolves? hosts))]
+          (let [rows (map vector hosts states)
+                missing-hosts (filter (comp false? second) rows)
+                errored (filter (comp #{:error} second) rows)
+                w (apply max 1 (map count (concat hosts deps)))]
+            (println (str "SCANNED\t" (count files) " files"
+                          "\tDECLARED-HOSTS\t" (count hosts)
+                          "\tWORKSPACE-DEPS\t" (count deps)
+                          "\tPACKAGES-HERE\t" (count provided)))
+            (println (str "control\t" control-host "\tresolves"))
+            (println)
+            (doseq [[h state] rows]
+              (println (str (pad-left h w) "  "
+                            (case state
+                              true  "resolves"
+                              false "NXDOMAIN"
+                              "LOOKUP-ERROR")
+                            "  <- " (str/join ", " (get declared h)))))
+            (when (seq deps) (println))
+            (doseq [d deps]
+              (println (str (pad-left d w) "  "
+                            (if (contains? provided d) "provided" "NOT-IN-WORKSPACE")
+                            "  <- " (str/join ", " (get ws-deps d)))))
+            (println)
+            (cond
+              (seq errored)
+              (do (println (str "COULD NOT ANSWER: " (count errored)
+                                " host(s) failed to look up for a reason other than NXDOMAIN."))
+                  (process/exit 3))
+
+              (or (seq missing-hosts) (seq missing-deps))
+              (do (println (str (count missing-hosts) " of " (count hosts)
+                                " declared hosts do not exist; "
+                                (count missing-deps) " of " (count deps)
+                                " workspace dependencies are not in this repo."))
+                  (println "The README's status table should say exactly this. If it does not, update it.")
+                  (process/exit 1))
+
+              :else
+              (do (println "Everything declared is backed. The README's \"not live\" table is stale — update it.")
+                  (process/exit 0)))))))))
+
+(-main)
