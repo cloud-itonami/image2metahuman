@@ -4,9 +4,11 @@
 generator.** `kotodama.jsonld` describes an autonomous actor that takes a
 photograph and produces a MetaHuman DNA calibration with FACS facial
 animation, LOD0–LOD3 meshes and multi-layer skin SSS. What is actually in this
-repo is that description, a licence notice, extraction provenance, and a Svelte
-scaffold whose entire rendered output is a heading and the sentence *"Vite entry
-scaffold after SvelteKit cleanup."*
+repo is that description, a licence notice, extraction provenance, and a
+reagent + re-frame ClojureScript scaffold whose entire rendered output is a
+heading and the sentence *"Vite entry scaffold after SvelteKit cleanup."* —
+yes, still that sentence; see [below](#2026-08-26-svelte--clojurescript)
+for why it survived a framework migration unchanged.
 
 There is **no photo analysis, no DNA calibration, no mesh, and no renderer
 here** — not an incomplete one, none. Read this repo as a *claim staked*, not as
@@ -14,14 +16,16 @@ software.
 
 It declares itself `kind :app` (`README.edn`) and was extracted verbatim from
 `etzhayyim/root` at `60-apps/etzhayyim-project-image2metahuman`
-(`migration.edn`, source revision `c3a74d20d7`, 13 files / 46,413 bytes). The
-extraction is the repo's only commit.
+(`migration.edn`, source revision `c3a74d20d7`, 13 files / 46,413 bytes). That
+extraction is unaffected by anything below — `migration.edn` is provenance for
+*that* event, not a description of the current tree, and is not rewritten
+when the tree changes.
 
-## Status: nothing it declares is reachable — measured 2026-08-13
+## Status: nothing it declares is reachable — measured 2026-08-26
 
-Measured against tip `c68a7e9` — the extraction commit, the only content this
-repo had before this README. Re-take the measurement rather than trusting the
-table: **`nbb docs/check-declared.cljs`** (see
+Measured on a clean checkout of this branch, after the Svelte → ClojureScript
+frontend migration described below. Re-take the measurement rather than
+trusting the table: **`nbb docs/check-declared.cljs`** (see
 [the quickstart](docs/operator-quickstart.md)).
 
 | declared thing | declared in | exists? |
@@ -30,65 +34,74 @@ table: **`nbb docs/check-declared.cljs`** (see
 | `im2mh8n1.etzhayyim.com` | `kotodama.jsonld` `routes`, `@id` | **NXDOMAIN** |
 | `kami.etzhayyim.com` | `kotodama.jsonld` RACI *consulted* | **NXDOMAIN** |
 | `yoro.etzhayyim.com` | `kotodama.jsonld` RACI *informed* | resolves |
-| `@etzhayyim/kami-engine-sdk` | `svelte/package.json` `workspace:*` | **not in this repo** |
 | `@etzhayyim/kotodama-host-sdk` | `appview/…/package.json` `workspace:*` | **not in this repo** |
 
 A control lookup against `registry.npmjs.org` resolved in the same run, so the
-NXDOMAINs are genuine absences and not a broken resolver here.
+NXDOMAINs are genuine absences and not a broken resolver here. The row for
+`@etzhayyim/kami-engine-sdk` (`svelte/package.json` `workspace:*`) that used
+to be in this table is gone because `svelte/` is gone — see below.
 
 Two consequences, and they are different in kind:
 
 - **The actor is not deployed.** Neither route host exists, and there is no
   deploy config in the repo (no `wrangler.jsonc`, no workflow) that would put
   one there.
-- **The repo cannot be installed as it stands.** Both `package.json` files
-  depend on `workspace:*` siblings that the extraction left behind. `pnpm
-  install` fails:
+- **The frontend now installs and builds cleanly; the backend still does
+  not.** `appview/…/cljs/` (below) has no dangling dependency and its build is
+  verified green. The outer `appview/…/package.json` — the Worker entry
+  point's own manifest, untouched by this migration — still depends on the
+  `workspace:*` sibling `@etzhayyim/kotodama-host-sdk` that the original
+  extraction from `etzhayyim/root` left behind:
 
   ```
-  ERR_PNPM_WORKSPACE_PKG_NOT_FOUND  "@etzhayyim/kami-engine-sdk@workspace:*" is in
-  the dependencies but no package named "@etzhayyim/kami-engine-sdk" is present in
+   ERR_PNPM_WORKSPACE_PKG_NOT_FOUND  In : "@etzhayyim/kotodama-host-sdk@workspace:*" is
+  in the dependencies but no package named "@etzhayyim/kotodama-host-sdk" is present in
   the workspace
   ```
 
-  This is not a stale error message. It is the current state of the repo for
-  anyone who clones it.
+  That is a backend concern (the XRPC/Worker entry point), out of scope for a
+  frontend migration, and this migration did not touch it.
 
-## The dangling dependency is the interesting part
+## 2026-08-26: Svelte → ClojureScript
 
-Nothing under `src/` imports either SDK — `grep -r kami-engine-sdk` over the
-TypeScript and Svelte sources returns nothing. So the dependency is unused, and
-deleting it would make `pnpm install` succeed in about ten seconds.
+`appview/…/svelte/` — the Vite + Svelte 5 scaffold described below until this
+date — has been replaced by `appview/…/cljs/`: the identical scaffold
+(same heading, same paragraph, same layout), ported to reagent + re-frame,
+rendered with `jp-go-dds` (デジタル庁デザインシステム) hiccup, as part of this
+workspace's repo-wide Svelte retirement (`svelte-cljs-wave`).
 
-**Do not delete it.** It is the only thing in the repo that records what this
-app was supposed to be built out of. Removing it would turn a visibly unfinished
-app into an apparently finished one that renders a placeholder — the failure
-would stop being legible. A throwaway copy with the dependency removed builds
-fine and is how the quickstart lets you see the scaffold render; that copy is a
-probe, not a fix.
+**On the dangling dependency.** The deleted `svelte/package.json` carried an
+unused `@etzhayyim/kami-engine-sdk` `workspace:*` dependency — nothing under
+`svelte/src/` ever imported it (`grep -r kami-engine-sdk` returned nothing,
+same as before). The previous revision of this README warned against deleting
+that dependency on its own, on the grounds that it was "the only thing in the
+repo that records what this app was supposed to be built out of," and that
+removing it would make an unfinished app look finished. That warning was
+about a *narrow* fix — dropping the one line to make `pnpm install` pass while
+leaving everything else as-is. What happened instead is a **wholesale
+frontend replacement**, workspace-wide and not specific to this repo, and the
+replacement is exactly as much of a placeholder as what it replaced (same
+rendered text, no capability implemented). The intent the dangling dependency
+recorded — that a real implementation here would need a 3D avatar
+renderer — is not lost: this workspace's repo-wide rule ("3D はすべて
+kami-engine を使う") already requires that of *any* future MetaHuman/3D work
+in this workspace, dangling `package.json` line or not. `cljs/src/image2metahuman/app.cljs`
+says so explicitly in its own docstring, so the record persists in prose
+instead of in an unresolvable dependency declaration.
 
-The lockfile says the same thing from the other side. `svelte/pnpm-lock.yaml`
-(1,222 lines) predates the SvelteKit cleanup and disagrees with the
-`package.json` next to it:
+**Verified**, on this branch, before merge:
 
-| | `package.json` declares | `pnpm-lock.yaml` records |
-|---|---|---|
-| `@etzhayyim/kami-engine-sdk` | `workspace:*` | `file:../../../../../packages/engine/kami-engine/kami-engine-sdk` |
-| `@pixiv/three-vrm` | — | `^3.3.3` → 3.5.1 |
-| `three` | — | `^0.170.0` → 0.170.0 |
+```
+$ npm install                       # appview/…/cljs — no workspace:* dependency, installs clean
+$ npx shadow-cljs compile app       # [:app] Build completed. (111 files, 110 compiled, 0 warnings, 41.84s)
+$ npx shadow-cljs compile test      # [:test] Build completed. (112 files, 111 compiled, 0 warnings, 9.65s)
+$ node out/tests.js                 # Ran 4 tests containing 6 assertions. 0 failures, 0 errors.
+```
 
-That `file:` path climbs five directories above this repo's root. It is the old
-monorepo layout, fossilised. The three.js pair it locks looks equally dated:
-the sibling repo `cloud-itonami/image2vrm` records in its `CLAUDE.md` that
-`@etzhayyim/kami-engine-sdk` removed all three.js code paths on 2026-05-26,
-leaving the KAMI Engine wgpu path as the sole renderer. That is a second-hand
-citation — it names an ADR (`ADR-2605264300`) that is **not** in this
-workspace's ADR set — so treat it as a lead, not as established fact.
-
-**Recorded, not repaired.** Reconciling them means deciding where
-`@etzhayyim/kami-engine-sdk` comes from now — vendored, published to a registry,
-or replaced — and that decision determines what this app will be. It is not a
-documentation change.
+`svelte/pnpm-lock.yaml` — which predated the SvelteKit cleanup and still
+recorded `three`/`@pixiv/three-vrm` and a `file:` path five directories above
+this repo's root — is gone with the rest of `svelte/`. That fossil is no
+longer this repo's problem to reconcile.
 
 ## What is actually in here
 
@@ -108,19 +121,25 @@ compliance frameworks `MetaHuman-license`, `biometric-data-minimization`,
 in this repo processes a photograph**, so nothing implements them either — they
 describe obligations that would attach the moment someone does.
 
-### 2. `appview/…/svelte/` — a Vite + Svelte 5 scaffold
+### 2. `appview/…/cljs/` — a reagent + re-frame scaffold, rendered with jp-go-dds
 
-`App.svelte` is 32 lines, 27 of which are a `<style>` block. It renders one
-`<h1>` and one `<p>`. `main.ts` mounts it. There is no router, no route table,
-and no second view; every path serves the same document.
+`src/image2metahuman/app.cljs` holds the same two strings the old
+`App.svelte` rendered as bare markup literals — a heading and one paragraph —
+as re-frame app-db data instead (`:page/heading`, `:page/description`), with
+a `reg-event-db`/`reg-sub` pair and `4` tests / `6` assertions covering them.
+There is no router, no route table, and no second view; every path serves the
+same document, same as before.
 
-It does build, once the dangling dependency is worked around: 135 modules,
-`dist/` at 0.40 kB HTML + 0.32 kB CSS + 2.70 kB JS. That number is the honest
-size of what exists.
-
-`package.json` also has a peer mismatch that `pnpm` reports on install:
-`@sveltejs/vite-plugin-svelte` 4.0.4 wants `vite@^5.0.0`, while the same file
-asks for `vite@^6.4.2`. The build succeeds anyway.
+It builds clean: `shadow-cljs compile app` reports `111 files, 110 compiled, 0
+warnings` (measured 2026-08-26). `deps.edn` keeps reagent/re-frame/
+clojurescript/shadow-cljs under the `:cljs` alias rather than top-level
+`:deps`, per this workspace's `jvm-new-surface-guard` PreToolUse hook
+(ADR-2608201300, which denies new top-level JVM runtime deps) — only
+`org.clojure/clojure` and the `jp-go-digital-design-system` git dependency are
+top-level. `public/index.html`'s inlined `<style>` was generated once, at
+authoring time, via `jp-go-dds.page/->page` on the JVM (see the regeneration
+recipe in `app.cljs`'s docstring) — the browser bundle itself only needs
+`jp-go-dds.core`.
 
 ### 3. `README.edn` / `migration.edn` / `NOTICE` — identity and provenance
 
@@ -133,10 +152,12 @@ on them:
   follow.
 - `README.edn` declares `:kind :app`, but this workspace's classifier reads the
   repo as *unclassified*. It calls something an app when a root `src/` sits next
-  to a UI marker; here it finds the UI marker (`index.html`, recorded as the
-  `:ui` trait) but no root `src/`, because the sources are five levels down under
-  `appview/`. The declaration and the observation disagree; neither has been
-  corrected in favour of the other.
+  to a UI marker; here it finds the UI marker (`kotodama.jsonld`'s
+  `uiType: appview`, recorded as the `:ui` trait) but no root `src/`, because
+  the sources are five levels down under `appview/…/cljs/src/`. The declaration
+  and the observation disagree; neither has been corrected in favour of the
+  other. This did not change with the Svelte → ClojureScript migration — the
+  Svelte sources were equally deep, under `appview/…/svelte/src/`.
 
 ### 4. `docs/` — this README's evidence
 
@@ -148,17 +169,20 @@ on them:
 Two constraints already apply to this repo and are easy to miss:
 
 - **ADR-2607052000** (`90-docs/adr/…-kami-engine-sdk-svelte-retirement-cljs-migration.edn`)
-  retires Svelte from `kami-engine-sdk` in favour of ClojureScript, and names
-  `image2metahuman` explicitly among the consumer apps that are **out of scope** —
-  they "keep using the current published Svelte package at their pinned version
-  until they separately choose to migrate". Note the assumption in that
-  sentence: a *pinned published* version. This repo pins nothing and depends on
-  a workspace sibling, so it is not in the state the ADR assumes its consumers
-  are in.
+  retires Svelte from `kami-engine-sdk` in favour of ClojureScript, and named
+  `image2metahuman` explicitly among the consumer apps that were, at the time,
+  **out of scope** — they could "keep using the current published Svelte
+  package at their pinned version until they separately choose to migrate."
+  That carve-out assumed a *pinned published* Svelte version; this repo never
+  had one (it depended on an unresolvable `workspace:*` sibling instead), so
+  the assumption the ADR's exemption rests on never actually held here. The
+  2026-08-26 migration above resolves that mismatch by migrating anyway, as
+  part of a workspace-wide wave rather than a per-repo decision.
 - **3D in this workspace goes through `kami-engine`**, WebGPU first with a
   WebGL 2.0 fallback, consuming the canonical EDN render-IR. A second renderer
   — three.js, Babylon, or a hand-rolled one — is not an option here, whatever
-  the fossilised lockfile suggests.
+  the fossilised `svelte/pnpm-lock.yaml` used to suggest (that lockfile is now
+  gone along with the rest of `svelte/`).
 
 ## Boundary with the nearest repos
 
