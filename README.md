@@ -25,7 +25,7 @@ when the tree changes.
 
 Measured on a clean checkout of this branch, after the Svelte → ClojureScript
 frontend migration described below. Re-take the measurement rather than
-trusting the table: **`nbb docs/check-declared.cljk`** (see
+trusting the table: **`kbb --backend sci docs/check-declared.cljk`** (see
 [the quickstart](docs/operator-quickstart.md)).
 
 | declared thing | declared in | exists? |
@@ -93,8 +93,8 @@ instead of in an unresolvable dependency declaration.
 
 ```
 $ npm install                       # appview/…/cljs — no workspace:* dependency, installs clean
-$ npx shadow-cljs compile app       # [:app] Build completed. (111 files, 110 compiled, 0 warnings, 41.84s)
-$ npx shadow-cljs compile test      # [:test] Build completed. (112 files, 111 compiled, 0 warnings, 9.65s)
+$ amu compile --target wasm32-browser app       # [:app] Build completed. (111 files, 110 compiled, 0 warnings, 41.84s)
+$ amu compile --target wasm32-browser test      # [:test] Build completed. (112 files, 111 compiled, 0 warnings, 9.65s)
 $ node out/tests.js                 # Ran 4 tests containing 6 assertions. 0 failures, 0 errors.
 ```
 
@@ -130,7 +130,7 @@ a `reg-event-db`/`reg-sub` pair and `4` tests / `6` assertions covering them.
 There is no router, no route table, and no second view; every path serves the
 same document, same as before.
 
-It builds clean: `shadow-cljs compile app` reports `111 files, 110 compiled, 0
+It builds clean: `amu compile --target wasm32-browser app` reports `111 files, 110 compiled, 0
 warnings` (measured 2026-08-26). `deps.edn` keeps reagent/re-frame/
 clojurescript/shadow-cljs under the `:cljs` alias rather than top-level
 `:deps`, per this workspace's `jvm-new-surface-guard` PreToolUse hook

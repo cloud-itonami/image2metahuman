@@ -42,7 +42,7 @@ APP=appview/etzhayyim-wasm-image2metahuman-im2mh8n1
 From the repo root:
 
 ```bash
-nbb docs/check-declared.cljk
+kbb --backend sci docs/check-declared.cljk
 ```
 
 Observed — **exit 1**, and exit 1 is the expected result today:
@@ -156,7 +156,7 @@ Builds in this workspace are serialised repo-wide (CLAUDE.md, resource
 governor). Do **not** call `shadow-cljs` directly:
 
 ```bash
-node /path/to/com-junkawasaki/scripts/resource-guard.mjs run build -- npx shadow-cljs compile app
+node /path/to/com-junkawasaki/scripts/resource-guard.mjs run build -- amu compile --target wasm32-browser app
 ```
 
 If another session holds the build lock you get
@@ -174,7 +174,7 @@ Observed on success — **exit 0**:
 Then the test build, the same way:
 
 ```bash
-node /path/to/com-junkawasaki/scripts/resource-guard.mjs run build -- npx shadow-cljs compile test
+node /path/to/com-junkawasaki/scripts/resource-guard.mjs run build -- amu compile --target wasm32-browser test
 ```
 
 ```
@@ -232,7 +232,7 @@ predates this migration and is not touched by it — `kotoba/src/registry.ts`
 Unlike the old Vite/pnpm setup, there is no separate preview server step —
 `public/index.html` is a complete, self-contained document (DADS CSS inlined
 by `jp-go-dds.page/->page` at authoring time) that loads `js/app.js`, produced
-by step 3's `shadow-cljs compile app`, via a plain relative `<script>` tag.
+by step 3's `amu compile --target wasm32-browser app`, via a plain relative `<script>` tag.
 Open it directly:
 
 ```bash
@@ -250,7 +250,7 @@ to reach — same as before.
 If you want a live-reloading dev loop instead of a one-shot build:
 
 ```bash
-npx shadow-cljs watch app
+amu compile --target wasm32-browser app
 ```
 
 then open (or reload) the same `public/index.html`. `Ctrl-C` to stop.
