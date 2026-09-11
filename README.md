@@ -25,7 +25,7 @@ when the tree changes.
 
 Measured on a clean checkout of this branch, after the Svelte → ClojureScript
 frontend migration described below. Re-take the measurement rather than
-trusting the table: **`nbb docs/check-declared.cljs`** (see
+trusting the table: **`nbb docs/check-declared.cljk`** (see
 [the quickstart](docs/operator-quickstart.md)).
 
 | declared thing | declared in | exists? |
@@ -161,7 +161,7 @@ on them:
 
 ### 4. `docs/` — this README's evidence
 
-`docs/check-declared.cljs` re-measures the status table above.
+`docs/check-declared.cljk` re-measures the status table above.
 `docs/operator-quickstart.md` walks the repo end to end.
 
 ## If someone implements this
