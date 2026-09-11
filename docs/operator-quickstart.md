@@ -42,7 +42,7 @@ APP=appview/etzhayyim-wasm-image2metahuman-im2mh8n1
 From the repo root:
 
 ```bash
-nbb docs/check-declared.cljs
+nbb docs/check-declared.cljk
 ```
 
 Observed — **exit 1**, and exit 1 is the expected result today:
@@ -107,9 +107,9 @@ Observed — and this is a genuine, small regression in the check's precision
 that this migration introduced, not a hidden implementation:
 
 ```
-appview/etzhayyim-wasm-image2metahuman-im2mh8n1/cljs/src/image2metahuman/app.cljs
-      88 appview/etzhayyim-wasm-image2metahuman-im2mh8n1/cljs/src/image2metahuman/app.cljs
-      29 appview/etzhayyim-wasm-image2metahuman-im2mh8n1/cljs/test/image2metahuman/app_test.cljs
+appview/etzhayyim-wasm-image2metahuman-im2mh8n1/cljs/src/image2metahuman/app.cljk
+      88 appview/etzhayyim-wasm-image2metahuman-im2mh8n1/cljs/src/image2metahuman/app.cljk
+      29 appview/etzhayyim-wasm-image2metahuman-im2mh8n1/cljs/test/image2metahuman/app_test.cljk
 ```
 
 The old Svelte scaffold's grep here returned `(nothing)`, because Svelte
