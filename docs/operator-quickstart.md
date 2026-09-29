@@ -152,7 +152,7 @@ public npm registry; reagent/re-frame/clojurescript/shadow-cljs's *JVM-side*
 classpath comes from `deps.edn`'s `:cljs` alias, resolved by the `clojure`
 CLI, not by npm).
 
-Builds in this workspace are serialised repo-wide (CLAUDE.md, resource
+Builds in this workspace are serialised repo-wide (AGENTS.md, resource
 governor). Do **not** call `shadow-cljs` directly:
 
 ```bash
