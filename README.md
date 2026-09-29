@@ -188,7 +188,7 @@ Two constraints already apply to this repo and are easy to miss:
 
 - **`cloud-itonami/image2vrm`** — the sibling with the same shape and the same
   extraction, targeting **VRM** avatars instead of MetaHuman. Unlike this one it
-  has a written design (`docs/character-maker-design.md`) and a CLAUDE.md
+  has a written design (`docs/character-maker-design.md`) and a AGENTS.md
   describing a working KAMI Engine wgpu pipeline. If you are looking for how
   this repo was *meant* to work, read that one.
 - **`kotoba-lang/character`** — the portable `.cljc` character model. Engine
